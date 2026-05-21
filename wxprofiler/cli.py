@@ -1,5 +1,46 @@
 from __future__ import annotations
 
+import os
+import sys
+import builtins
+
+# Windows portable EXE note:
+# The GUI launches this CLI backend as a child process and reads WXPROGRESS
+# lines from stdout. On some Windows systems the default pipe encoding is
+# cp1252/ANSI, which cannot encode Chinese progress text and crashes the
+# frozen executable. Force UTF-8 and fall back to replacement-safe writes.
+os.environ.setdefault("PYTHONUTF8", "1")
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+for _stream in (getattr(sys, "stdout", None), getattr(sys, "stderr", None)):
+    try:
+        if _stream and hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+def safe_print(*args, **kwargs) -> None:
+    text = " ".join(str(a) for a in args)
+    end = kwargs.pop("end", "\n")
+    flush = kwargs.pop("flush", False)
+    stream = kwargs.pop("file", sys.stdout)
+    try:
+        builtins.print(text, end=end, file=stream, flush=flush, **kwargs)
+    except UnicodeEncodeError:
+        data = (text + end).encode("utf-8", errors="replace")
+        try:
+            buffer = getattr(stream, "buffer", None)
+            if buffer is not None:
+                buffer.write(data)
+                if flush:
+                    buffer.flush()
+            else:
+                stream.write((text + end).encode("ascii", errors="replace").decode("ascii"))
+                if flush:
+                    stream.flush()
+        except Exception:
+            pass
+
 import argparse
 import json
 from datetime import date, timedelta
@@ -36,7 +77,7 @@ def default_start(years: int) -> date:
 
 
 def emit_progress(percent: int, message: str) -> None:
-    print(f"WXPROGRESS:{percent}:{message}", flush=True)
+    safe_safe_print(f"WXPROGRESS:{percent}:{message}", flush=True)
 
 
 def _coverage_for(obs, start: date, end: date) -> float:
@@ -237,7 +278,7 @@ def command_profile(args) -> dict[str, Any]:
             emit_progress(88, "生成图表")
             chart_artifacts = create_all_charts(profile, paths["charts_dir"])
         except Exception as exc:
-            print(f"Chart generation skipped/failed: {exc}")
+            safe_print(f"Chart generation skipped/failed: {exc}")
     profile["generatedArtifacts"] = {"tables": table_artifacts, "charts": chart_artifacts}
     emit_progress(92, "写入 JSON profile")
     write_json(profile, paths["profile_json"])
@@ -251,23 +292,23 @@ def command_profile(args) -> dict[str, Any]:
             emit_progress(98, "写入 PDF 报告")
             write_pdf_report(profile, paths["report_pdf"])
         except Exception as exc:
-            print(f"PDF generation skipped/failed: {exc}")
+            safe_print(f"PDF generation skipped/failed: {exc}")
 
     emit_progress(100, "完成")
-    print(f"{airport}: {len(obs)} observations")
-    print(f"Profile: {paths['profile_json']}")
-    print(f"Report:  {paths['report_md']}")
-    print(f"HTML:    {paths['report_html']}")
+    safe_print(f"{airport}: {len(obs)} observations")
+    safe_print(f"Profile: {paths['profile_json']}")
+    safe_print(f"Report:  {paths['report_md']}")
+    safe_print(f"HTML:    {paths['report_html']}")
     if not getattr(args, "no_pdf", False):
-        print(f"PDF:     {paths['report_pdf']}")
-    print(f"CSV:     {paths['processed_csv']}")
-    print(f"Tables:  {paths['tables_dir']}")
+        safe_print(f"PDF:     {paths['report_pdf']}")
+    safe_print(f"CSV:     {paths['processed_csv']}")
+    safe_print(f"Tables:  {paths['tables_dir']}")
     if chart_artifacts:
-        print(f"Charts:  {paths['charts_dir']}")
+        safe_print(f"Charts:  {paths['charts_dir']}")
     if profile["quality"].get("warnings"):
-        print("Warnings:")
+        safe_print("Warnings:")
         for w in profile["quality"]["warnings"]:
-            print(f"- {w}")
+            safe_print(f"- {w}")
     return profile
 
 
@@ -289,7 +330,7 @@ def command_render(args) -> None:
             emit_progress(88, "生成图表")
             chart_artifacts = create_all_charts(profile, charts_dir)
         except Exception as exc:
-            print(f"Chart generation skipped/failed: {exc}")
+            safe_print(f"Chart generation skipped/failed: {exc}")
     profile["generatedArtifacts"] = {"tables": table_artifacts, "charts": chart_artifacts}
     write_markdown_report(profile, report_md)
     if not getattr(args, "no_html", False):
@@ -300,14 +341,14 @@ def command_render(args) -> None:
             emit_progress(98, "写入 PDF 报告")
             write_pdf_report(profile, report_pdf)
         except Exception as exc:
-            print(f"PDF generation skipped/failed: {exc}")
-    print(f"Rendered report: {report_md}")
-    print(f"HTML report:     {report_html}")
+            safe_print(f"PDF generation skipped/failed: {exc}")
+    safe_print(f"Rendered report: {report_md}")
+    safe_print(f"HTML report:     {report_html}")
     if not getattr(args, "no_pdf", False):
-        print(f"PDF report:      {report_pdf}")
-    print(f"Tables:          {tables_dir}")
+        safe_print(f"PDF report:      {report_pdf}")
+    safe_print(f"Tables:          {tables_dir}")
     if chart_artifacts:
-        print(f"Charts:          {charts_dir}")
+        safe_print(f"Charts:          {charts_dir}")
 
 
 def command_batch(args) -> None:
@@ -318,11 +359,11 @@ def command_batch(args) -> None:
         emit_progress(int((idx - 1) / total_airports * 90), f"批量处理 {idx}/{total_airports}: {airport}")
         args.airport = airport
         args.runways = None
-        print(f"\n=== {airport} ===")
+        safe_print(f"\n=== {airport} ===")
         try:
             profiles.append(command_profile(args))
         except Exception as exc:
-            print(f"FAILED {airport}: {exc}")
+            safe_print(f"FAILED {airport}: {exc}")
     emit_progress(92, "生成批量对比报告")
     if profiles and getattr(args, "compare_report", True):
         out = Path(args.out_dir) / "reports" / "batch_compare"
@@ -330,8 +371,8 @@ def command_batch(args) -> None:
         write_compare_csv(profiles, out / "batch_compare_summary.csv")
         charts = {} if getattr(args, "no_charts", False) else write_compare_charts(profiles, out / "charts")
         write_compare_html(profiles, out / "batch_compare_report.html", charts)
-        print(f"Batch compare CSV:  {out / 'batch_compare_summary.csv'}")
-        print(f"Batch compare HTML: {out / 'batch_compare_report.html'}")
+        safe_print(f"Batch compare CSV:  {out / 'batch_compare_summary.csv'}")
+        safe_print(f"Batch compare HTML: {out / 'batch_compare_report.html'}")
     emit_progress(100, "批量完成")
 
 
@@ -358,14 +399,14 @@ def command_compare(args) -> None:
     write_compare_csv(profiles, csv_path)
     charts = {} if getattr(args, "no_charts", False) else write_compare_charts(profiles, out / "charts")
     write_compare_html(profiles, html_path, charts)
-    print(f"Compare CSV:  {csv_path}")
-    print(f"Compare HTML: {html_path}")
-    print("airport,samples,coverage,vfr,mvfr,ifr,lifr,snow,rain,fog_mist,gust")
+    safe_print(f"Compare CSV:  {csv_path}")
+    safe_print(f"Compare HTML: {html_path}")
+    safe_print("airport,samples,coverage,vfr,mvfr,ifr,lifr,snow,rain,fog_mist,gust")
     emit_progress(100, "对比完成")
     for p in profiles:
         o = p["overall"]
         wr = o["weatherRates"]
-        print(",".join(map(str, [
+        safe_print(",".join(map(str, [
             p["airport"]["icao"], p["quality"]["sampleCount"], p["quality"]["coverageRate"],
             o["vfrRate"], o["mvfrRate"], o["ifrRate"], o["lifrRate"],
             wr["snow"], wr["rain"], round(wr.get("fog", 0) + wr.get("mist", 0), 4), o["gustRate"],

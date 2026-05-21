@@ -535,11 +535,15 @@ class WeatherProfilerApp(tk.Tk):
                     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
                 env = os.environ.copy()
                 env.setdefault("PYTHONUNBUFFERED", "1")
+                env.setdefault("PYTHONUTF8", "1")
+                env.setdefault("PYTHONIOENCODING", "utf-8")
                 proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     bufsize=1,
                     cwd=str(Path.cwd()),
                     env=env,

@@ -1,0 +1,20 @@
+[project]
+name = "airport-weather-profiler"
+version = "0.1.0"
+description = "Universal airport historical weather profiler for METAR/ASOS/ISD-style data"
+requires-python = ">=3.10"
+authors = [{ name = "Airport Weather Profiler" }]
+dependencies = ["matplotlib>=3.7", "reportlab>=4.0"]
+
+[project.scripts]
+wxprofiler = "wxprofiler.cli:main"
+wxprofiler-gui = "wxprofiler.gui:main"
+
+[tool.setuptools]
+packages = [
+  "wxprofiler",
+  "wxprofiler.sources",
+  "wxprofiler.parsing",
+  "wxprofiler.analysis",
+  "wxprofiler.output",
+]

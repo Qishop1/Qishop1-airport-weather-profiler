@@ -1,0 +1,14 @@
+airport: RJCC
+timezone: Asia/Tokyo
+latitude: 42.7752
+longitude: 141.6923
+elevation_m: 25
+runways:
+  - id: 01L
+    heading: 10
+  - id: 19R
+    heading: 190
+  - id: 01R
+    heading: 10
+  - id: 19L
+    heading: 190

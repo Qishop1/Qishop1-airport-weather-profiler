@@ -1,0 +1,19 @@
+airport: KLAX
+timezone: America/Los_Angeles
+runways:
+  - id: 06L
+    heading: 69
+  - id: 24R
+    heading: 249
+  - id: 06R
+    heading: 69
+  - id: 24L
+    heading: 249
+  - id: 07L
+    heading: 69
+  - id: 25R
+    heading: 249
+  - id: 07R
+    heading: 69
+  - id: 25L
+    heading: 249
